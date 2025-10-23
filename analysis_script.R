@@ -646,8 +646,13 @@ ps_glom <- tax_glom(ps_rel, tax_level)
 ASV_tab <- as.data.frame(ps_glom@otu_table) # CHANGE BETWEEN ps_glom OR ps_rel
 ASV_t <- t(ASV_tab)
 
+# Environmental metadata                                  
+meta_merged <- read.csv("wims_summaries_3months.csv", header = T, check.names = F) %>% 
+  select(2, matches("(_mean|_combined)$")) %>% # only mean columns
+  column_to_rownames(., var = "Extended_ID")
+
 # Subset metadata to numeric variables of interest
-variables <- "Nitrate-N"
+variables <- "Nitrate as N_mean"
 meta_sub <- meta[variables]
 
 # Remove rows with NA
@@ -655,22 +660,26 @@ meta_sub2 <- as.data.frame(na.omit(meta_sub))
 
 # Subset to remaining samples
 ASV_t2 <- as.data.frame(ASV_t[rownames(ASV_t) %in% rownames(meta_sub2),])
+meta_sub2 <- as.data.frame(meta_sub2[intersect(rownames(meta_sub2), rownames(ASV_t2)), , drop=F])
 
 # Remove ASVs with occurrence <3
 ASV_t3 <- ASV_t2[, colSums(ASV_t2 > 0) >= 3]
 
+# Match order of rows
+ASV_t4 <- ASV_t3[match(rownames(meta_sub2), rownames(ASV_t3)), ]
+
 # Test a subset
 meta_sub2_subset <- head(meta_sub2, 50)
-ASV_t3_subset <- ASV_t3[rownames(ASV_t3) %in% rownames(meta_sub2_subset),]
-ASV_t3_subset <- ASV_t3_subset[, colSums(ASV_t3_subset > 0) >= 3]
+ASV_t4_subset <- ASV_t4[rownames(ASV_t4) %in% rownames(meta_sub2_subset),]
+ASV_t4_subset <- ASV_t4_subset[, colSums(ASV_t4_subset > 0) >= 3]
 
 start <- date()
-test <- titan(meta_sub2_subset, ASV_t3_subset, minSplt = 5, numPerm = 500, boot = T, nBoot = 500, imax = F, ivTot = F, pur.cut = 0.95, rel.cut = 0.95, ncpus = 16)
+test <- titan(meta_sub2_subset, ASV_t4_subset, minSplt = 5, numPerm = 500, boot = T, nBoot = 500, imax = F, ivTot = F, pur.cut = 0.95, rel.cut = 0.95, ncpus = 16)
 end <- date()
 
-# Run on the full sample list grouped at genera level (1173 samples x 1714 genera) - 24-28 hours
+# Run on the full sample list grouped at genera level
 start <- date()
-titan_genera_nitrate <- titan(meta_sub2, ASV_t3, minSplt = 5, numPerm = 500, boot = T, nBoot = 500, imax = F, ivTot = F, pur.cut = 0.95, rel.cut = 0.95, ncpus = 16)
+titan_genera_nitrate <- titan(meta_sub2, ASV_t4, minSplt = 5, numPerm = 500, boot = T, nBoot = 500, imax = F, ivTot = F, pur.cut = 0.95, rel.cut = 0.95, ncpus = 16)
 end <- date()
 
 # saveRDS(titan_genera_nitrate, file = "output/titan/titan_genera_nitrate.rds")
@@ -833,4 +842,5 @@ plot
 
 ggsave("output/mikropml/feat_importance_plot_nitrate.png", plot, width = 160, height = 190, units = "mm", dpi = 600)
 ggsave("output/mikropml/feat_importance_plot_nitrate.pdf", plot, width = 160, height = 190, units = "mm")
+
 
